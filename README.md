@@ -8,6 +8,6 @@ Programa .
 Para compilar, ejecutar los siguientes comandos: 
 - `make all`
 Este comando compila todos los programas dentro de este proyecto.
-Ejecute escribiendo ./main cantidadEnDireccion1 cantidadEnDireccion2 maximaCapacidad
+Ejecute escribiendo ./main cantidadEnEste cantidadEnOeste maximaCapacidadDelPuente
 
 
