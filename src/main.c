@@ -17,45 +17,43 @@ It include the additional features poutlined in the project description:
 		 it switches traffic to the other direction)
 Designs:
 	2 conditional variables:
-		toward_hanover
-		toward_norwich
+		toward_west
+		toward_east
 	They basically functioned as green lights for each direction of traffic.
 	More exlanation in the code.
 */
 
-#include <pthread.h> 				// for threads
-#include <time.h>					// for random seed
-#include <stdlib.h>	
-#include <stdio.h>				
+#include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
+#include <pthread.h>
+#include <time.h>
 
-// directions for the bridge
-#define TO_NORWICH 0
-#define TO_HANOVER 1
-
-// max cars for simulation
-#define MAX_CARS 10000
+#define MAX_CARS 1000
+#define TO_EAST 0
+#define TO_WEST 1
 
 // taken from lecture notes
 #  define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP \
   { { 0, 0, 0, PTHREAD_MUTEX_ERRORCHECK_NP, 0, { 0 } } }
 
-// global variables
-int bridge[MAX_CARS+1];				// cars on the bridge
-int hanover_waiting[MAX_CARS+1];	// cars waiting for hanover
-int norwich_waiting[MAX_CARS+1];	// cars waiting for norwich
+// variables globales
+// Los siguientes arrays representan el puente y las listas de espera de cada lado.
+int bridge[MAX_CARS+1];
+int east_waiting[MAX_CARS+1];
+int west_waiting[MAX_CARS+1];
 
-int amount_of_traffic;				// total # of cars to cross (argv[1])
+int amount_of_traffic; // total # of cars to cross (argv[1])
 int max_load;
 
-int hanover_count;					// # on hanover cars on the bridge now
-int norwich_count;					// # of norwich cars on the bridge now
-	
-int hanover_wait;					// # of hanover cars waiting for the bridge
-int norwich_wait;					// # of norwich cars waiting for the bridge
+int east_count; // # of norwich cars on the bridge now
+int west_count; // # on hanover cars on the bridge now
 
-int hanover_lim;					// # of hanover cars that have crossed in a row
-int norwich_lim;					// # of norwich cars that have crossed in a row
+int east_wait; // # of norwich cars waiting for the bridge
+int west_wait; // # of hanover cars waiting for the bridge
+
+int east_lim; // # of norwich cars that have crossed in a row
+int west_lim; // # of hanover cars that have crossed in a row
 
 int firstDirectionAmount = 0;
 int secondDirectionAmount = 0;
@@ -64,56 +62,50 @@ pthread_mutex_t lock =  PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
 
 
 /*
-	toward_hanover -- a green light for the hanover traffic
-		(they wait for it, and it gets signalled when the bridge is
-		free of norwich traffic)
-	toward_norwich -- the same as the above, but for norwich
+	toward_west -- un semaforo para el trafico desde el oeste (recibe una senial cuando 
+		el puente esta libre de trafico desde el este).
+	toward_east -- un semaforo para el trafico desde el este (recibe una senial cuando 
+		el puente esta libre de trafico desde el oeste).
 */
-
-pthread_cond_t toward_hanover = PTHREAD_COND_INITIALIZER; 
-pthread_cond_t toward_norwich = PTHREAD_COND_INITIALIZER;
+pthread_cond_t toward_west = PTHREAD_COND_INITIALIZER; 
+pthread_cond_t toward_east = PTHREAD_COND_INITIALIZER;
 
 
 /*
- Takes an int max and returns a random number from [0, max]
+ Genera un numero random desde 0 hasta max.
 */
-int genRand(int max)
-{
+int generateRandom(int max){
 	return rand() % (max + 1);
 }
 
 /*
- Takes the direction of the current car, and prints the status of the
- bridge in an easy to digest fashion.
+ Imprime el estado del puente y las listas de espera de cada lado.
 */
-void printStatus(int direction)
-{
-	if(direction == TO_NORWICH)
-		printf("\tBRIDGE (NORWICH_BOUND):\t{");
+void printStatus(int direction){
+	//Los carros se imprimen en orden numerico. Si el carro en i no esta en el puente, se usa -1.
+	//-----------------------------------------------------------
+	if(direction == TO_EAST)
+		printf("\tPUENTE (HACIA EL ESTE):\t{");
 	else
-		printf("\tBRIDGE (HANOVER_BOUND):\t{");
+		printf("\tPUENTE (HACIA EL OESTE):\t{");
 
-// This prints the cars on the bridge in numerical order
-// -1 means that the car at that index is not on the bridge
 	for(int i = 0; i < amount_of_traffic; i++)
 		if(bridge[i] != -1)
 			printf(" %d ", bridge[i]);
+			
+	//-----------------------------------------------------------
+	printf("}\n\tESPERANDO EN EL ESTE:\t{");
 
-	printf("}\n\tWAITING FOR NORWICH:\t{");
-
-// This prints the cars waiting to go to Norwich in numerical order
-// -1 means that the car at that index is not waiting for Norwich
 	for(int i = 0; i < amount_of_traffic; i++)
-		if(norwich_waiting[i] != -1)
-			printf(" %d ", norwich_waiting[i]);
+		if(east_waiting[i] != -1)
+			printf(" %d ", east_waiting[i]);
+			
+	//-----------------------------------------------------------
+	printf("}\n\tESPERANDO EN EL OESTE:\t{");
 
-	printf("}\n\tWAITING FOR HANOVER:\t{");
-
-// This prints the cars waiting to go to Hanover in numerical order
-// -1 means that the car at that index is not waiting for Hanover
 	for(int i = 0; i < amount_of_traffic; i++)
-		if(hanover_waiting[i] != -1)
-			printf(" %d ", hanover_waiting[i]);	
+		if(west_waiting[i] != -1)
+			printf(" %d ", west_waiting[i]);	
 
 	printf("}\n\n");
 
@@ -157,81 +149,81 @@ void *oneVehicle(void *vargp)
 			exit(-1);
 		}
 	
-	if(direction == TO_NORWICH)
+	if(direction == TO_EAST)
 	{
 // Until the signal has been acquired, this vehicle is waiting.  It's saved
 // in the waiting array and counted among the waiting cars.
-		norwich_wait++;		
-		norwich_waiting[car_number] = car_number;
+		east_wait++;		
+		east_waiting[car_number] = car_number;
 
 // If there's no traffic going the other way on the bridge, and still room
 // (under the max_load), then wait for the green light and acquire the lock.
-		while(hanover_count > 0 || norwich_count >= max_load)
+		while(west_count > 0 || east_count >= max_load)
 		{
-		pthread_cond_wait(&toward_norwich, &lock);
+		pthread_cond_wait(&toward_east, &lock);
 		}
 
 // Now that it's received the green light, it's no longer waiting.
-		norwich_waiting[car_number] = -1;	
-		hanover_waiting[car_number] = -1;
-		norwich_wait--;
+		east_waiting[car_number] = -1;	
+		west_waiting[car_number] = -1;
+		east_wait--;
 
 // It's on the bridge, so now it's counted in that array.
-		norwich_count++;	
+		east_count++;	
 		bridge[car_number] = car_number;			
 
 // And it's consecutive count is maintained to switch directions later.
-		norwich_lim++;
+		east_lim++;
 
 // The state of the bridge has changed, so print its new state.
 		printf("%d is on the bridge:\n", car_number);
-		printStatus(TO_NORWICH);
+		printStatus(TO_EAST);
 
 // If there are no more norwich-bound cars OR max_load*2 norwich-bound cars
 // have already crossed, stop traffic and signal traffic for the other direction.
 // Otherwise, keep them coming this way.
-		if((norwich_count == 0 || norwich_lim >= (max_load*2)) && hanover_wait > 0)
-			pthread_cond_signal(&toward_hanover);
+		if((east_count == 0 || east_lim >= (max_load*2)) && west_wait > 0)
+			pthread_cond_signal(&toward_west);
 		else
-			pthread_cond_signal(&toward_norwich);
+			pthread_cond_signal(&toward_east);
 	}
 	else
 	{
 // Until the signal has been acquired, this vehicle is waiting.  It's saved
 // in the waiting array and counted among the waiting cars.
-		hanover_wait++;	
-		hanover_waiting[car_number] = car_number;	
+		west_wait++;	
+		west_waiting[car_number] = car_number;	
 
 // If there's no traffic going the other way on the bridge, and still room
 // (under the max_load), then wait for the green light and acquire the lock.
-		while(norwich_count > 0 || hanover_count >= max_load)
+		while(east_count > 0 || west_count >= max_load)
 		{
-		pthread_cond_wait(&toward_hanover, &lock);
+		pthread_cond_wait(&toward_west, &lock);
 		}
 
 // Now that it's received the green light, it's no longer waiting.
-		norwich_waiting[car_number] = -1;	
-		hanover_waiting[car_number] = -1;	
-		hanover_wait--;
+		east_waiting[car_number] = -1;	
+		west_waiting[car_number] = -1;	
+		west_wait--;
 
 // It's on the bridge, so now it's counted in that array.
-		hanover_count++;
+		west_count++;
 		bridge[car_number] = car_number;
 
 // And it's consecutive count is maintained to switch directions later.
-		hanover_lim++;
+		west_lim++;
 
 // The state of the bridge has changed, so print its new state.
 		printf("%d is on the bridge:\n", car_number);
-		printStatus(TO_HANOVER);
+		printStatus(TO_WEST);
 
 // If there are no more hanover-bound cars OR max_load*2 hanover-bound cars
 // have already crossed, stop traffic and signal traffic for the other direction.
 // Otherwise, keep them coming this way.
-		if((hanover_count == 0 || hanover_lim >= (max_load*2)) && norwich_wait > 0)
-			pthread_cond_signal(&toward_norwich);
+		if((west_count == 0 || west_lim >= (max_load*2)) && east_wait > 0)
+			pthread_cond_signal(&toward_east);
 		else
-			pthread_cond_signal(&toward_hanover);
+			pthread_cond_signal(&toward_west);
 	}
 
 	rc = pthread_mutex_unlock(&lock);
@@ -260,47 +252,47 @@ void *oneVehicle(void *vargp)
 			exit(-1);
 		}
 	
-	if(direction == TO_NORWICH)
+	if(direction == TO_EAST)
 	{	
 // Car has left the bridge (record it in arrays)
-		norwich_count--;
+		east_count--;
 		bridge[car_number] = -1;	
 
 // The opposite direction's consecutive travel meter can be reset
-		hanover_lim = 0;
+		west_lim = 0;
 
 // If there are no more norwich-bound cars OR max_load*2 norwich-bound cars
 // have already crossed, stop traffic and signal traffic for the other direction.
 // Otherwise, keep them coming this way.
-		if((norwich_count == 0 || norwich_lim >= (max_load*2)) && hanover_wait > 0)
-			pthread_cond_signal(&toward_hanover);
+		if((east_count == 0 || east_lim >= (max_load*2)) && west_wait > 0)
+			pthread_cond_signal(&toward_west);
 		else
-			pthread_cond_signal(&toward_norwich);
+			pthread_cond_signal(&toward_east);
 
 // The status of the bridge has changed, so print it again.
 		printf("%d is off the bridge:\n", car_number);
-		printStatus(TO_NORWICH);
+		printStatus(TO_EAST);
 	}
 	else
 	{
 // Car has left the bridge (record it in arrays)
-		hanover_count--;
+		west_count--;
 		bridge[car_number] = -1;		
 
 // The opposite direction's consecutive travel meter can be reset
-		norwich_lim = 0;
+		east_lim = 0;
 
 // If there are no more hanover-bound cars OR max_load*2 hanover-bound cars
 // have already crossed, stop traffic and signal traffic for the other direction.
 // Otherwise, keep them coming this way.
-		if((hanover_count == 0 || hanover_lim >= (max_load*2)) && norwich_wait > 0)
-			pthread_cond_signal(&toward_norwich);
+		if((west_count == 0 || west_lim >= (max_load*2)) && east_wait > 0)
+			pthread_cond_signal(&toward_east);
 		else
-			pthread_cond_signal(&toward_hanover);
+			pthread_cond_signal(&toward_west);
 
 // The status of the bridge has changed, so print it again.
 		printf("%d is off the bridge:\n", car_number);
-		printStatus(TO_HANOVER);
+		printStatus(TO_WEST);
 	}
 
 	rc = pthread_mutex_unlock(&lock);
@@ -330,18 +322,18 @@ int main(int argc, char *argv[])
 // the following lines initialize all the threads variables to zero and the
 // values in the arrays to -1
 
-	norwich_count = 0;
-	norwich_wait = 0;
-	norwich_lim = 0;
+	east_count = 0;
+	east_wait = 0;
+	east_lim = 0;
 
-	hanover_count = 0;
-	hanover_wait = 0;
-	hanover_lim = 0;
+	west_count = 0;
+	west_wait = 0;
+	west_lim = 0;
 
 	for(i = 0; i < amount_of_traffic; i++)
 	{
-		hanover_waiting[i] = -1;
-		norwich_waiting[i] = -1;
+		west_waiting[i] = -1;
+		east_waiting[i] = -1;
 		bridge[i] = -1;
 	}
 
