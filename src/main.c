@@ -96,7 +96,7 @@ void printStatus(int direction)
 /*
 Funcion principal que usa cada hilo/carro.
 */
-void *oneVehicle(void *vargp)
+void *carMovement(void *vargp)
 {
 	struct arg_struct *args = vargp;
 	int lock_result;
@@ -112,8 +112,9 @@ void *oneVehicle(void *vargp)
 		to_west_amount--;
 	}
 
-	printf("\n-----[Se creó el %d con dirección %d]-----\n", car_id, direction);
-
+	printf("\n-----[Se creó el %d con dirección %d y va en camino al puente]-----\n", car_id, direction);
+	sleep(3);
+	printf("\n-----[Ha llegado al puente el %d con dirección %d]-----\n", car_id, direction);
 	/*
 	Llegada al puente: El hilo puede obtener el lock segun su direccion. Si no hay carros en el puente
 	en direccion opuesta y aun hay campo, el hilo espera por su luz verde.
@@ -142,7 +143,8 @@ void *oneVehicle(void *vargp)
 		east_count++; // Entra al puente
 		bridge[car_id] = car_id;
 
-		printf("%d esta en el puente:\n", car_id);
+		//printf("%d esta en el puente:\n", car_id); borrar
+		printf("\n-----[%d esta en el puente:]-----\n", car_id);
 		printStatus(TO_EAST);
 
 		// Si no hay mas carros que van hacia el este, se da la senial para la otra direccion.
@@ -168,7 +170,8 @@ void *oneVehicle(void *vargp)
 		west_count++; // Entra al puente
 		bridge[car_id] = car_id;
 
-		printf("%d esta en el puente:\n", car_id);
+		//printf("%d esta en el puente:\n", car_id); borrar
+		printf("\n-----[%d esta en el puente:]-----\n", car_id);
 		printStatus(TO_WEST);
 
 		// Si no hay mas carros que van hacia el oeste, se da la senial para la otra direccion.
@@ -211,7 +214,8 @@ void *oneVehicle(void *vargp)
 		else
 			pthread_cond_signal(&toward_east);
 
-		printf("%d esta fuera del puente:\n", car_id);
+		//printf("%d esta fuera del puente:\n", car_id); borrar
+		printf("\n-----[%d esta fuera del puente:]-----\n", car_id);
 		printStatus(TO_EAST);
 	}
 	else
@@ -225,7 +229,8 @@ void *oneVehicle(void *vargp)
 		else
 			pthread_cond_signal(&toward_west);
 
-		printf("%d esta fuera del puente:\n", car_id);
+		//printf("%d esta fuera del puente:\n", car_id); borrar
+		printf("\n-----[%d esta fuera del puente:]-----\n", car_id);
 		printStatus(TO_WEST);
 	}
 
@@ -235,7 +240,8 @@ void *oneVehicle(void *vargp)
 		printf("Unlock fallo! %d\n", lock_result);
 		exit(-1);
 	}
-
+	sleep(3);
+	printf("\n-----[%d ya termino su trayecto completo con dirección %d]-----\n", car_id, direction);
 	return NULL;
 }
 
@@ -284,6 +290,32 @@ void create_dirs_and_suffle(int *dirs, int to_east_amount, int total_cars_simula
 	}
 }
 
+// Esta función crea todos los vehiculos como hilos con tiempos de espera alternados.
+int createCars(int *dirs, pthread_t *cars){
+	int i, result;
+	// Ciclo que recorre la cantidad total de autos creando de forma aleatoria y con tiempos distribuidos sus respectivos hilos.
+	for (i = 0; i < total_cars_simulated; i++)
+	{
+		// Create the arguments to be send through the thread creator.
+		thread_args = malloc(sizeof(struct arg_struct) * 1);
+		thread_args->id = i;
+		thread_args->dir = dirs[i];
+
+		// Pthread crea un hilo para un auto, se le asigna un id y la dirección. Además, se asocia la función handler del hilo (carMovement).
+		result = pthread_create(&cars[i], NULL, carMovement, thread_args);
+		int delay_time = get_delay_time(MEDIAN);
+		sleep((int)round(delay_time));
+
+		// Si se produce un error al crear el hilo se genera un mensaje.
+		if (result)
+		{
+			printf("Fallo al crear hilo nuevo %d\n", result);
+			exit(-1);
+		}
+	}
+	return result;
+}
+
 int main(int argc, char *argv[])
 {
 	// Revisar los parametros antes de ejecutar.
@@ -330,28 +362,9 @@ int main(int argc, char *argv[])
 		bridge[i] = -1;
 	}
 
-	// Ciclo que recorre la cantidad total de autos creando de forma aleatoria y con tiempos distribuidos sus respectivos hilos.
-	for (i = 0; i < total_cars_simulated; i++)
-	{
-		// Create the arguments to be send through the thread creator.
-		thread_args = malloc(sizeof(struct arg_struct) * 1);
-		thread_args->id = i;
-		thread_args->dir = dirs[i];
+	result = createCars(dirs, cars);
 
-		// Pthread crea un hilo para un auto, se le asigna un id y la dirección. Además, se asocia la función handler del hilo (oneVehicle).
-		result = pthread_create(&cars[i], NULL, oneVehicle, thread_args);
-		int delay_time = get_delay_time(MEDIAN);
-		sleep((int)round(delay_time));
-
-		// Si se produce un error al crear el hilo se genera un mensaje.
-		if (result)
-		{
-			printf("Fallo al crear hilo nuevo %d\n", result);
-			exit(-1);
-		}
-	}
-
-	// Esperar para cierre de los hilos.
+	//Esperar para cierre de los hilos.
 	for (i = 0; i < total_cars_simulated; i++)
 	{
 		result = pthread_join(cars[i], NULL);
