@@ -10,13 +10,13 @@
 #define MAX_CARS 1000
 #define TO_EAST 0
 #define TO_WEST 1
-#define MEDIAN 3
+#define MEDIAN 2
 
 // TODO: revisar para saber si remover o no.
 #define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP            \
 	{                                                      \
 		{                                                  \
-			0, 0, 0, PTHREAD_MUTEX_ERRORCHECK_NP, 0, { 0 } \
+			0, 0, 0, PTHREAD_MUTEX_ERRORCHECK_NP, 0,  0  \
 		}                                                  \
 	}
 // ************* Lista de varibles globales *************
