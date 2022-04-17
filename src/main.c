@@ -26,7 +26,7 @@ int bridge[MAX_CARS + 1];
 int east_waiting[MAX_CARS + 1];
 int west_waiting[MAX_CARS + 1];
 
-int amount_of_traffic; 					// Total de autos.
+int total_cars_simulated; 					// Total de autos.
 int max_load;								// Total de autos que soporta el puente.
 int east_count; 	// # de carros cruzando el puente puente desde el este
 int west_count; 	// # de carros cruzando el puente puente desde el oeste
@@ -50,11 +50,7 @@ pthread_cond_t toward_west = PTHREAD_COND_INITIALIZER;
 pthread_cond_t toward_east = PTHREAD_COND_INITIALIZER;
 
 // ************* Lista de funciones de utilidad *************
-// Genera un numero random desde 0 hasta max.
-int generateRandom(int max)
-{
-	return rand() % (max + 1);
-}
+
 
 // Devuelve el tiempo de espera en segundos según una distribución exponencial.
 double get_delay_time (int median) {
@@ -75,21 +71,21 @@ void printStatus(int direction)
 	else
 		printf("\tPUENTE (HACIA EL OESTE):\t{");
 
-	for (int i = 0; i < amount_of_traffic; i++)
+	for (int i = 0; i < total_cars_simulated; i++)
 		if (bridge[i] != -1)
 			printf(" %d ", bridge[i]);
 
 	//-----------------------------------------------------------
 	printf("}\n\tESPERANDO EN EL ESTE:\t{");
 
-	for (int i = 0; i < amount_of_traffic; i++)
+	for (int i = 0; i < total_cars_simulated; i++)
 		if (east_waiting[i] != -1)
 			printf(" %d ", east_waiting[i]);
 
 	//-----------------------------------------------------------
 	printf("}\n\tESPERANDO EN EL OESTE:\t{");
 
-	for (int i = 0; i < amount_of_traffic; i++)
+	for (int i = 0; i < total_cars_simulated; i++)
 		if (west_waiting[i] != -1)
 			printf(" %d ", west_waiting[i]);
 
@@ -264,10 +260,10 @@ void swap(int *a, int *b)
 }
 
 // Esta función  crea un array con las direcciones y luego lo revuelve de forma aleatoria.
-void create_dirs_and_suffle(int *dirs, int to_east_amount, int amount_of_traffic)
+void create_dirs_and_suffle(int *dirs, int to_east_amount, int total_cars_simulated)
 {
 
-	for (int index = 0; index < amount_of_traffic; index++)
+	for (int index = 0; index < total_cars_simulated; index++)
 	{
 		if (index < to_east_amount)
 		{
@@ -305,10 +301,10 @@ int main(int argc, char *argv[])
 	max_load = atoi(argv[3]);
 
 	// Cantidad total de tráfico para esta ejecución.
-	amount_of_traffic = to_east_amount + to_west_amount;
+	total_cars_simulated = to_east_amount + to_west_amount;
 
 	// Almacenas todos los hilos/autos.
-	pthread_t cars[amount_of_traffic];
+	pthread_t cars[total_cars_simulated];
 
 	int i, result;
 
@@ -323,11 +319,11 @@ int main(int argc, char *argv[])
 	west_wait = 0;
 
 	// Antes de iniciar, se quiere generar los autos de forma aleatoria, así que generamos una lista para las direcciones.
-	int dirs[amount_of_traffic];
-	create_dirs_and_suffle(dirs, to_east_amount, amount_of_traffic);
+	int dirs[total_cars_simulated];
+	create_dirs_and_suffle(dirs, to_east_amount, total_cars_simulated);
 
 	// Crea los estados por defecto para las listas de espera y el puente.
-	for (i = 0; i < amount_of_traffic; i++)
+	for (i = 0; i < total_cars_simulated; i++)
 	{
 		west_waiting[i] = -1;
 		east_waiting[i] = -1;
@@ -335,7 +331,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Ciclo que recorre la cantidad total de autos creando de forma aleatoria y con tiempos distribuidos sus respectivos hilos.
-	for (i = 0; i < amount_of_traffic; i++)
+	for (i = 0; i < total_cars_simulated; i++)
 	{
 		// Create the arguments to be send through the thread creator.
 		thread_args = malloc(sizeof(struct arg_struct) * 1);
@@ -356,7 +352,7 @@ int main(int argc, char *argv[])
 	}
 
 	// Esperar para cierre de los hilos.
-	for (i = 0; i < amount_of_traffic; i++)
+	for (i = 0; i < total_cars_simulated; i++)
 	{
 		result = pthread_join(cars[i], NULL);
 
