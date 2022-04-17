@@ -65,29 +65,29 @@ void printStatus(int direction)
 	// Los carros se imprimen en orden numerico. Si el carro en i no esta en el puente, se usa -1.
 	//-----------------------------------------------------------
 	if (direction == TO_EAST)
-		printf("\tPUENTE (HACIA EL ESTE):\t{");
+		printf("PUENTE (HACIA EL ESTE): {");
 	else
-		printf("\tPUENTE (HACIA EL OESTE):\t{");
+		printf("PUENTE (HACIA EL OESTE): {");
 
 	for (int i = 0; i < total_cars_simulated; i++)
 		if (bridge[i] != -1)
-			printf(" %d ", bridge[i]);
+			printf(" [Auto %d] ", bridge[i]);
 
 	//-----------------------------------------------------------
-	printf("}\n\tESPERANDO EN EL ESTE:\t{");
+	printf("}\nESPERANDO EN EL ESTE: {");
 
 	for (int i = 0; i < total_cars_simulated; i++)
 		if (east_waiting[i] != -1)
-			printf(" %d ", east_waiting[i]);
+			printf(" [Auto %d] ", east_waiting[i]);
 
 	//-----------------------------------------------------------
-	printf("}\n\tESPERANDO EN EL OESTE:\t{");
+	printf("}\nESPERANDO EN EL OESTE:{");
 
 	for (int i = 0; i < total_cars_simulated; i++)
 		if (west_waiting[i] != -1)
-			printf(" %d ", west_waiting[i]);
+			printf(" [Auto %d] ", west_waiting[i]);
 
-	printf("}\n\n");
+	printf("}\n");
 	fflush(NULL);
 }
 
@@ -100,19 +100,15 @@ void *carMovement(void *vargp)
 	int lock_result;
 	int car_id = args->id;
 	int direction = args->dir;
-
-	if (direction == TO_EAST)
-	{
-		to_east_amount--;
+	char *text_dir;
+	if(direction == 1){
+		text_dir = "Oeste";
+	} else{
+		 text_dir= "Este";
 	}
-	else if (direction == TO_WEST)
-	{
-		to_west_amount--;
-	}
-
-	printf("\n-----[Se creó el %d con dirección %d y va en camino al puente]-----\n", car_id, direction);
+	printf("\n🚖===================[Se creó el {auto #%d} con dirección %s]===================🚖\n", car_id, text_dir);
 	sleep(3);
-	printf("\n-----[Ha llegado al puente el %d con dirección %d]-----\n", car_id, direction);
+	printf("\n\t\t⚠️-Ha llegado al puente el {auto #%d} con dirección %s-⚠️\n", car_id, text_dir);
 	/*
 	Llegada al puente: El hilo puede obtener el lock segun su direccion. Si no hay carros en el puente
 	en direccion opuesta y aun hay campo, el hilo espera por su luz verde.
@@ -141,8 +137,7 @@ void *carMovement(void *vargp)
 		east_count++; // Entra al puente
 		bridge[car_id] = car_id;
 
-		// printf("%d esta en el puente:\n", car_id); borrar
-		printf("\n-----[%d esta en el puente:]-----\n", car_id);
+		printf("\n\t\t\t🌉---<El {auto %d} esta en el puente>---🌉\n", car_id);
 		printStatus(TO_EAST);
 
 		// Si no hay mas carros que van hacia el este, se da la senial para la otra direccion.
@@ -168,8 +163,7 @@ void *carMovement(void *vargp)
 		west_count++; // Entra al puente
 		bridge[car_id] = car_id;
 
-		// printf("%d esta en el puente:\n", car_id); borrar
-		printf("\n-----[%d esta en el puente:]-----\n", car_id);
+		printf("\n\t\t\t🌉---<El {auto %d} esta en el puente>---🌉\n", car_id);
 		printStatus(TO_WEST);
 
 		// Si no hay mas carros que van hacia el oeste, se da la senial para la otra direccion.
@@ -212,8 +206,7 @@ void *carMovement(void *vargp)
 		else
 			pthread_cond_signal(&toward_east);
 
-		// printf("%d esta fuera del puente:\n", car_id); borrar
-		printf("\n-----[%d esta fuera del puente:]-----\n", car_id);
+		printf("\n\t\t\t✅[El {auto #%d} está fuera del puente:]✅\n", car_id);
 		printStatus(TO_EAST);
 	}
 	else
@@ -226,9 +219,7 @@ void *carMovement(void *vargp)
 			pthread_cond_signal(&toward_east);
 		else
 			pthread_cond_signal(&toward_west);
-
-		// printf("%d esta fuera del puente:\n", car_id); borrar
-		printf("\n-----[%d esta fuera del puente:]-----\n", car_id);
+		printf("\n\t\t\t✅[El {auto #%d} está fuera del puente:]✅\n", car_id);
 		printStatus(TO_WEST);
 	}
 
@@ -239,7 +230,12 @@ void *carMovement(void *vargp)
 		exit(-1);
 	}
 	sleep(3);
-	printf("\n-----[%d ya termino su trayecto completo con dirección %d]-----\n", car_id, direction);
+	if(direction == 1){
+		text_dir = "Oeste";
+	} else{
+		 text_dir= "Este";
+	}
+	printf("\n🚖===================[El {auto %d} termino de cruzar en dirección %s]===================🚖\n", car_id, text_dir);
 	return NULL;
 }
 
@@ -250,9 +246,15 @@ int check_paramethers(int argc, char *argv[])
 	{
 		printf("\n--Warning--\nPara ejecutar escriba:  ./main to_east_amount to_west_amount \n");
 		return 1;
+	} 
+
+	if (!atoi(argv[1])> 0 || !atoi(argv[2])>0) {
+		printf("\n Ingrese número mayores a 0\n");
+		printf("\n--Warning--\nPara ejecutar escriba:  ./main to_east_amount to_west_amount \n");
+		return 1;
 	}
-	else
-		return 0;
+	
+	return 0;
 }
 
 // Intercambia los valores de posiciones aleatorias del array.
