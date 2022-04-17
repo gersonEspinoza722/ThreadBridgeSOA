@@ -5,8 +5,10 @@ Al brindar el comando con los debidos parámetros se generan vehículos con dire
 ## Prerequisitos
 Sistema operativo de Linux, Ubuntu se usó para su desarrollo y pruebas.
 
-## USO
+## Compilar
 Para compilar, ejecutar los siguientes comandos: 
 - `make all`
 Este comando compila todos los programas dentro de este proyecto.
-Ejecute escribiendo ./main cantidadDesdeElEste cantidadDesdeElOeste dentro de la carpeta build. 
+## Ejecutar
+Ejecute escribiendo dentro de la carpeta build. 
+- `./main cantidadDesdeElEste cantidadDesdeElOeste`
