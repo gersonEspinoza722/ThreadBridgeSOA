@@ -1,60 +1,71 @@
+// *************  Lista de bibliotecas importadas *************
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <pthread.h>
 #include <time.h>
+#include <math.h>
 
+// ************* Lista de varibles CONSTANTES definidas *************
 #define MAX_CARS 1000
 #define TO_EAST 0
 #define TO_WEST 1
+#define MEDIAN 2
 
-// taken from lecture notes TODO: Quitar esto?
+
+// TODO: revisar para saber si remover o no.
 #define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP            \
 	{                                                      \
 		{                                                  \
 			0, 0, 0, PTHREAD_MUTEX_ERRORCHECK_NP, 0, { 0 } \
 		}                                                  \
 	}
-
-// variables globales
+// ************* Lista de varibles globales *************
 // Los siguientes arrays representan el puente y las listas de espera de cada lado.
 int bridge[MAX_CARS + 1];
 int east_waiting[MAX_CARS + 1];
 int west_waiting[MAX_CARS + 1];
 
-int amount_of_traffic; // # de carros en total
-int max_load;
-
-int east_count; // # de carros cruzando el puente puente desde el este
-int west_count; // # de carros cruzando el puente puente desde el oeste
-int east_wait;	// # de carros hacia el este esperando para cruzar el puente
-int west_wait;	// # de carros hacia el oeste esperando para cruzar el puente
-
+int amount_of_traffic; 					// Total de autos.
+int max_load;								// Total de autos que soporta el puente.
+int east_count; 	// # de carros cruzando el puente puente desde el este
+int west_count; 	// # de carros cruzando el puente puente desde el oeste
+int east_wait;		// # de carros hacia el este esperando para cruzar el puente
+int west_wait;		// # de carros hacia el oeste esperando para cruzar el puente
 int to_east_amount = 0;
 int to_west_amount = 0;
 
-pthread_mutex_t lock = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+// ************* Lista de estructuras de datos *************
+struct arg_struct
+{
+	int id;
+	int dir;
+} * thread_args;
 
-/*
-toward_west -- un semaforo para el trafico desde el oeste (recibe una senial cuando
-	el puente esta libre de trafico desde el este).
-toward_east -- un semaforo para el trafico desde el este (recibe una senial cuando
-	el puente esta libre de trafico desde el oeste).
-*/
+// ************* Lista de variables de configuración para los threads *************
+pthread_mutex_t lock = PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP;
+// toward_west -- un semaforo para el trafico desde el oeste (recibe una senial cuando 	el puente esta libre de trafico desde el este).
 pthread_cond_t toward_west = PTHREAD_COND_INITIALIZER;
+// toward_east -- un semaforo para el trafico desde el este (recibe una senial cuando el puente esta libre de trafico desde el oeste).
 pthread_cond_t toward_east = PTHREAD_COND_INITIALIZER;
 
-/*
- Genera un numero random desde 0 hasta max.
-*/
+// ************* Lista de funciones de utilidad *************
+// Genera un numero random desde 0 hasta max.
 int generateRandom(int max)
 {
 	return rand() % (max + 1);
 }
 
-/*
- Imprime el estado del puente y las listas de espera de cada lado.
-*/
+// Devuelve el tiempo de espera en segundos según una distribución exponencial.
+double get_delay_time (int median) {
+    int val = rand();
+    while (val == RAND_MAX)
+        val = rand();
+    double decimal = (double) val / RAND_MAX;
+    return log (1 - decimal) * (-median);
+}
+
+// Imprime el estado del puente y las listas de espera de cada lado.
 void printStatus(int direction)
 {
 	// Los carros se imprimen en orden numerico. Si el carro en i no esta en el puente, se usa -1.
@@ -91,22 +102,21 @@ Funcion principal que usa cada hilo/carro.
 */
 void *oneVehicle(void *vargp)
 {
+	struct arg_struct *args = vargp;
 	int lock_result;
-	int direction;
-	int car_id = (int)vargp;
+	int car_id = args->id;
+	int direction = args->dir;
 
-	if (to_east_amount > 0)
+	if (direction == TO_EAST)
 	{
-		direction = TO_EAST;
 		to_east_amount--;
 	}
-	else if (to_west_amount > 0)
+	else if (direction == TO_WEST)
 	{
-		direction = TO_WEST;
 		to_west_amount--;
 	}
 
-	printf ("Se creó el %d con dirección %d \n", car_id, direction);
+	printf("\n-----[Se creó el %d con dirección %d]-----\n", car_id, direction);
 
 	/*
 	Llegada al puente: El hilo puede obtener el lock segun su direccion. Si no hay carros en el puente
@@ -233,23 +243,60 @@ void *oneVehicle(void *vargp)
 	return NULL;
 }
 
-/**
- * @brief Funcion utilizada para revisar que se ingresaron los parametros correctamente.
- */
-void check_paramethers(int argc, char *argv[])
+// Función utilizada para revisar que se ingresaron los parametros correctamente.
+int check_paramethers(int argc, char *argv[])
 {
-	if (argc < 3)
+	if (argc < 4)
 	{
-		printf("Para ejecutar escriba: \n ./main to_east_amount to_west_amount bridge_max_load");
-		exit(-1);
+		printf("\n--Warning--\nPara ejecutar escriba:  ./main to_east_amount to_west_amount bridge_max_load\n");
+		return 1;
+	}
+	else
+		return 0;
+}
+
+// Intercambia los valores de posiciones aleatorias del array.
+void swap(int *a, int *b)
+{
+	int temp = *a;
+	*a = *b;
+	*b = temp;
+}
+
+// Esta función  crea un array con las direcciones y luego lo revuelve de forma aleatoria.
+void create_dirs_and_suffle(int *dirs, int to_east_amount, int amount_of_traffic)
+{
+
+	for (int index = 0; index < amount_of_traffic; index++)
+	{
+		if (index < to_east_amount)
+		{
+			dirs[index] = 0;
+		}
+		else
+		{
+			dirs[index] = 1;
+		}
+	}
+
+	int n = sizeof(dirs) / sizeof(dirs[0]);
+	srand(time(NULL));
+	for (int i = n - 1; i > 0; i--)
+	{
+		int j = rand() % (i + 1);
+		swap(&dirs[i], &dirs[j]);
 	}
 }
 
 int main(int argc, char *argv[])
 {
 	// Revisar los parametros antes de ejecutar.
-	check_paramethers(argc, argv);
+	int error = check_paramethers(argc, argv);
 
+	if (error == 1)
+	{
+		exit(1);
+	}
 	// Leer de la consola la cantidad de autos en cada dirección.
 	to_east_amount = atoi(argv[1]);
 	to_west_amount = atoi(argv[2]);
@@ -275,6 +322,10 @@ int main(int argc, char *argv[])
 	west_count = 0;
 	west_wait = 0;
 
+	// Antes de iniciar, se quiere generar los autos de forma aleatoria, así que generamos una lista para las direcciones.
+	int dirs[amount_of_traffic];
+	create_dirs_and_suffle(dirs, to_east_amount, amount_of_traffic);
+
 	// Crea los estados por defecto para las listas de espera y el puente.
 	for (i = 0; i < amount_of_traffic; i++)
 	{
@@ -286,8 +337,15 @@ int main(int argc, char *argv[])
 	// Ciclo que recorre la cantidad total de autos creando de forma aleatoria y con tiempos distribuidos sus respectivos hilos.
 	for (i = 0; i < amount_of_traffic; i++)
 	{
+		// Create the arguments to be send through the thread creator.
+		thread_args = malloc(sizeof(struct arg_struct) * 1);
+		thread_args->id = i;
+		thread_args->dir = dirs[i];
+
 		// Pthread crea un hilo para un auto, se le asigna un id y la dirección. Además, se asocia la función handler del hilo (oneVehicle).
-		result = pthread_create(&cars[i], NULL, oneVehicle, (void *)i);
+		result = pthread_create(&cars[i], NULL, oneVehicle, thread_args);
+		int delay_time = get_delay_time(MEDIAN);
+		sleep((int)round(delay_time));
 
 		// Si se produce un error al crear el hilo se genera un mensaje.
 		if (result)
@@ -297,7 +355,7 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	// Esperar cierre de los hilos.
+	// Esperar para cierre de los hilos.
 	for (i = 0; i < amount_of_traffic; i++)
 	{
 		result = pthread_join(cars[i], NULL);
@@ -308,5 +366,6 @@ int main(int argc, char *argv[])
 			exit(-1);
 		}
 	}
+
 	return 0;
 }
