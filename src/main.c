@@ -11,14 +11,13 @@
 #define TO_EAST 0
 #define TO_WEST 1
 #define MEDIAN 2
-
-// TODO: revisar para saber si remover o no.
 #define PTHREAD_ERRORCHECK_MUTEX_INITIALIZER_NP            \
 	{                                                      \
 		{                                                  \
 			0, 0, 0, PTHREAD_MUTEX_ERRORCHECK_NP, 0,  0  \
 		}                                                  \
 	}
+	
 // ************* Lista de varibles globales *************
 // Los siguientes arrays representan el puente y las listas de espera de cada lado.
 int bridge[MAX_CARS + 1];
@@ -364,7 +363,6 @@ int main(int argc, char *argv[])
 	west_wait = 0;
 
 	// Antes de iniciar, se quiere generar los autos de forma aleatoria, así que generamos una lista para las direcciones.
-	// TODO: generar más alearoriamente.
 	int dirs[total_cars_simulated];
 	create_dirs_and_suffle(dirs, to_east_amount, to_west_amount);
 
